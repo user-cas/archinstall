@@ -537,10 +537,17 @@ prepare_pacstrap() {
 #  Search for '[[ expression ]]' in the bash manual.
 #  expamle at: https://gist.github.com/JPvRiel/4cf82d42beb6387dec7eadc43cef6c17
 #
+#  because i run into dependencies with multiple providers the my-audio-video 
+#  package cannot be installed without user input. I have to choose the correct
+#  package providers. this can be solved by installing --asdeps but then i cant
+#  use the automation in this function. This is sovled by using the 
+#  --assume-installed option. These options dont affect the installtion.
+#
 pacstrap_system() {
   printf '\n%s\n' "${FUNCNAME[0]}"
 
-  local mypackages=() numberedpackages=() orderedpackages=() pkg
+  local mypackages=() numberedpackages=() orderedpackages=() pkg fixdeps
+  fixdeps='--assume-installed jack --assume-installed libjack.so=0-64'
   readarray -t mypackages < <(pacman -Ssq '^my-')
 
   for pkg in "${mypackages[@]}"; do
@@ -550,19 +557,11 @@ pacstrap_system() {
   done
 
   readarray -t orderedpackages < <(printf '%s\n' "${numberedpackages[@]}" | sort)
-
   for pkg in "${orderedpackages[@]}"; do
     [[ $pkg =~ ^[0-9]{2}(.*) ]] && pkg="${BASH_REMATCH[1]}"
     printf '%s\n' "Installing ${pkg}"
-#  because i run into dependencies with multiple providers the my-audio-video 
-#  package cannot be installed without user input. I have to choose the correct
-#  package providers. this can be solved by installing --asdeps but then i cant
-#  use the automation in this function. This is sovled by using the 
-#  --assume-installed option. These options dont affect the installtion.
-    pacstrap "${TEMP_MNT}" \
-      # --assume-installed jack \
-      # --assume-installed libjack.so=0-64 \
-      "${pkg}" || fail "Failed to install ${pkg}"
+    pacstrap "${TEMP_MNT}" "${fixdeps}" "${pkg}" \
+      || fail "Failed to install ${pkg}"
   done
 
   cp -dr --no-preserve=mode,timestamp "${INSTALLER_DIR}/skel" "${TEMP_MNT}/etc"
