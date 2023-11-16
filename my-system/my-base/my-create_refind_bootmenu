@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -e
+configfile=/boot/efi/EFI/refind/refind_snapshot.conf
+
+head='menuentry "Arch Linux" {
+  icon /EFI/refind/theme/os_arch.png
+  volume SYSTEM_FS
+  loader boot/arch-linux.efi
+  options "root=LABEL=SYSTEM_FS"'
+
+body='  submenuentry "%s" {
+    add_options "rootflags=subvol=@/%s/snapshot"
+  }\n'
+
+tail='}'
+
+ 
+printconf() {
+
+  local snapshots=() number
+  readarray -t snapshots < <(snapper --jsonout list --columns number,description,date \
+    | jq -r '.root[] | {number,description,date} | join(", ")')
+
+  printf '%s\n' "${head}" > "${configfile}"
+  for snapshot in "${snapshots[@]:1}"; do
+    number=("$(IFS=","; echo ${snapshot} | awk '{print $1}')")
+    printf "${body}" "${snapshot}" "${number}" >> "${configfile}"
+  done
+  printf '%s' "${tail}" >> "${configfile}"
+}
+
+main() {
+local timestamp
+timestamp="$(date +%y%m%d%H%M)"
+  
+if [[ -e "${configfile}" ]]; then
+  mv "${configfile}" "${configfile}"."${timestamp}"
+  printconf
+else
+  printconf
+fi
+
+echo "Refind snapshots submenu updated"
+}
+
+main
+

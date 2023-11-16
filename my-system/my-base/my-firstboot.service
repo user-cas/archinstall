@@ -1,0 +1,9 @@
+[Unit]
+Description=Create a snapshot and set manual boot stanza in refind at first boot. It removes itself during execution.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/my-firstboot
+
+[Install]
+WantedBy=multi-user.target

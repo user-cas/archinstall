@@ -1,0 +1,28 @@
+# Maintainer: Cas 
+pkgname='my-audio-video'
+pkgdesc='Meta - pipewire & gstreamer [Install order = 20]'
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=()
+md5sums=()
+package(){
+  depends=(
+    'gst-libav'
+    'gstreamer'
+    'gstreamer-vaapi'
+    'wireplumber'
+    'pipewire'
+    'pipewire-alsa'
+    'pipewire-jack'
+    'pipewire-pulse'
+    'pipewire-v4l2' 
+    'gst-plugin-pipewire'
+    'gst-plugins-bad'
+    'gst-plugins-base'
+    'gst-plugins-good'
+    'gst-plugins-ugly' 
+  )
+}

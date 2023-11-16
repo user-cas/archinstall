@@ -1,0 +1,625 @@
+#!/usr/bin/env bash
+
+#
+# ______________________________________________________________________________
+# ___ Set contstants ___________________________________________________________
+# 
+#  Set ANSI escape sequences to manipulate printed lines.
+#  \e[H\e[2J = Move cursor to home position (0,0) and clear screen
+#  \e[2K = Erase the entire line
+#  \e[1A = Move up one line
+#  \e[1m = Prints everything in bold text from here
+#  \e[0m = Prints everything in "normal" text from here
+#  https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
+#
+readonly CLEAR='\e[H\e[2J'
+readonly DEL='\e[2K'
+readonly UP='\e[1A'
+readonly BOLD='\e[1m'
+readonly RESET='\e[0m'
+
+
+# ______________________________________________________________________________
+# ___ fail _____________________________________________________________________
+# 
+# usage: fail [ message ] [ custom errorcode ]
+#
+#
+# "${1:-''}" = $1 or '' when null or unset
+# "${2-1}" = $2 or "1" when unset
+# shellcheck disable=SC2120
+fail() {
+  local message="${1:-}"
+  printf '\n%s' "Script aborted"
+  printf '\n%s\n' "${message}"
+  exit "${2-1}" ## Return a code specified by $2, or 1 by default.
+}
+
+
+# ______________________________________________________________________________
+# ___  preflight_check  ________________________________________________________
+# 
+#  usage: preflight_check
+#
+# 
+preflight_check() {
+  [[ "${PWD}" = */archinstall ]] \
+    || fail "This script should be run from within the archinstall directory"
+  ping -qc1 -w1 www.archlinux.org | grep -q '1 received' \
+    || fail 'Ping archlinux.org failed'
+  [[ $(grep 'MemFree' < /proc/meminfo | awk '${print $2}') -lt 4000000 ]] \
+    || fail "Not enough memory to build all packages during install"
+}
+
+
+# ______________________________________________________________________________
+# ___  prepare_installation  ___________________________________________________
+# 
+#  usage: prepare_installation
+#
+#  https://wiki.archlinux.org/title/System_time#Time_standard
+#  base_devel is required for makepkg
+#  pacutils is required for pacinfo
+#
+#  global INSTALLER_DIR is set in the 
+# 
+prepare_installation() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  timedatectl set-ntp true
+  timedatectl set-local-rtc 0
+
+  mount -vo remount,size=4G /run/archiso/cowspace/ \
+    || fail "Failed to remount cowspace"
+
+  printf '%s\n' 'Generating mirrorlist (be patient this takes some time)'
+  reflector --country Netherlands,Germany --age 12 --protocol https \
+    --sort rate --latest 10 --save /etc/pacman.d/mirrorlist
+
+  sed -i 's|#ParallelDownloads = 5|ParallelDownloads = 15|' /etc/pacman.conf
+
+  printf '%s\n' 'Installing base-devel, git'
+  pacman -Sy --noconfirm archlinux-keyring
+  pacman -S --noconfirm --needed pacutils base-devel \
+    || fail "Pacman failed to install pacutils & base-devel"
+}
+
+
+
+# ______________________________________________________________________________
+# ___  get_answer ______________________________________________________________
+# 
+#  Usage: get_answer [ -c -n ] question returnvar
+#   -c = confirm entry
+#   -n = answer required
+#
+#  This function returns a value into a variable given as an argument using the
+#  "declare -n" builtin.
+#  See https://stackoverflow.com/a/38997681
+#
+get_answer() {
+  local OPTIND=1 confirm='no'
+  while getopts :cn opt; do
+    case "${opt}" in
+      c) confirm='yes' ;;
+      *) echo "unknown option ${opt}" && fail 'Unknown option for get_answer';;
+    esac
+  done
+  shift "$((OPTIND-1))"
+
+  # By using ANSI escape sequences to manipulate the cursor location and erase 
+  # previous lines the prompt remains on the same line.
+  local question="$1" reply='' confirmation='' 
+  while [[ -z "${reply}" ]]; do
+    printf "%s" "${question}"; read -r reply
+    if [[ -n "${reply}" ]] && [[ "${confirm}" == 'yes' ]]; then
+        printf "${UP}${DEL}%s" 'Repeat to confirm: '; read -r confirmation
+        if [[ "${reply}" != "${confirmation}" ]]; then
+          printf "${UP}${DEL}%s\n" 'Entry did not match!!'
+          # Abuse read for an interruptable 3 second sleep 
+          read -srt 3 -n 1
+          # clear reply to return to while loop
+          reply=''
+        fi
+    fi
+    # Cleanup output of the read line.
+    printf "${UP}${DEL}"
+  done
+
+  declare -n returnvar="$2"
+  returnvar="${reply}"
+}
+
+
+
+# ______________________________________________________________________________
+# ___  please_confirm  _________________________________________________________
+# 
+#  usage: please_confirm [ message ]
+#
+please_confirm() {
+  local message reply
+
+  message="$1"
+  if [[ -n "${message}" ]]; then
+    printf '\n%s\n' "${message}"
+  fi
+
+  until [[ "${reply}" == 'YES' ]]; do
+    printf '%s' "Type YES to confirm, ABORT to quit: "; read -r reply
+    if [[ 'ABORT' == "${reply}" ]]; then
+      fail "Aborted by user"
+    fi
+  done
+}
+
+
+
+# ______________________________________________________________________________
+# ___  print_hw_info  __________________________________________________________
+# 
+#  usage: print_hw_info -d -D -p disk -n i-N
+#
+print_hw_info() {
+  local OPTIND=1 
+  while getopts :dDp:nN opt; do
+    case "${opt}" in
+      d) # Print formatted table with available disks and their size
+        lsblk -dplx size -o name,size | grep -Ev "boot|rpmb|loop"
+        ;;
+      D) # Print an unformatted list of only the available disks
+        lsblk -dprno name
+        ;;
+      p) # Print partition info of the given disk
+        lsblk -plx name -o name,size,partlabel "${OPTARG}" 
+        ;;
+      n) # Print formatted table with available NICs, their state and IP
+        printf '%s\t%s\t%s\n' 'NIC' 'STATE' 'IP'
+        ip -brief address \
+          | grep -v '127.0.0.1' \
+          | awk '{printf "%s\t%s\t%s\n", $1, $2, $3}'
+        ;;
+      N) # Print an unformatted list with only the available NICs
+        ip -brief address \
+          | grep -v '127.0.0.1' \
+          | awk '{printf "%s\n", $1}'
+        ;;
+      *)
+        echo "unknown option ${opt}" >&2 && exit
+        ;;
+    esac
+  done
+}
+
+
+
+# ______________________________________________________________________________
+# ___  get_target_disk  ________________________________________________________
+# 
+#  usage: get_target_disk returnvar
+#
+#  This function returns a value into a variable given as an argument using the
+#  "declare -n" builtin.
+#  See https://stackoverflow.com/a/38997681
+#
+get_target_disk() {
+  printf '\n%s\n' "$(print_hw_info -d)"
+
+  local answer
+  until print_hw_info -D | grep -xsq "${answer}"; do
+    get_answer 'Enter exact device path: ' answer
+  done
+
+  declare -n returnvar="$1"
+  returnvar="${answer}"
+
+  # Cleanup output of this function.
+  local lines
+  lines="(($(print_hw_info -d | wc -l) + 1))"
+  for (( i = 0 ; i < "$lines" ; i++ )); do 
+    printf "${UP}${DEL}"
+  done
+}
+
+
+
+# ______________________________________________________________________________
+# ___  get_nic  ________________________________________________________________
+# 
+#  usage: get_nic returnvar
+#
+#  This function returns a value into a variable given as an argument using the
+#  "declare -n" builtin.
+#  See https://stackoverflow.com/a/38997681
+#
+# shellcheck disable=SC2034
+get_nic() {
+  printf '\n%s\n' "$(print_hw_info -n)"
+
+  local answer
+  until print_hw_info -N | grep -xsq "${answer}"; do
+    get_answer 'Enter exact nic name: ' answer
+  done
+
+  declare -n returnvar="$1"
+  returnvar="${answer}"
+
+  # Cleanup output of this function
+  local lines
+  lines="(($(print_hw_info -n | wc -l) + 1))"
+  for (( i = 0 ; i < "$lines" ; i++ )); do 
+    printf "${UP}${DEL}"
+  done
+}
+
+
+
+# ______________________________________________________________________________
+# ___  set_install_vars  _______________________________________________________
+# 
+#  usage: set_install_vars 
+#
+#  This function is used to set all variables used during the rest of the actual
+#  installation of the system. 
+#  
+set_install_vars() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  get_answer 'Enter hostname: ' HOST
+  get_answer 'Enter username: ' MYUSER
+  get_target_disk DISK
+  get_nic NIC
+  TEMP_MNT="$(mktemp -d)"
+  INSTALLER_DIR="${PWD}"
+}
+
+
+
+# ______________________________________________________________________________
+# ___  confirm_installation  ___________________________________________________
+# 
+#  usage: confirm_installation
+#
+#
+confirm_installation() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  local summary
+  printf -v summary '  
+  The following variables are set:  
+
+  Hostname = %s 
+  Username = %s  
+  Disk = %s
+  NIC = %s
+  Temporary mount point = %s
+  Archinstall directory = %s
+  
+  The specified disk will be erased and partioned if you continue installation.
+  (Check the "archinstall" script to find the partition table used)' \
+  "${HOST}" "${MYUSER}" "${DISK}" "${NIC}" "${TEMP_MNT}" "${INSTALLER_DIR}"
+
+  printf '%s\n\n' "${summary}"
+
+  please_confirm 'Please confirm these settings to continue installation'
+  readonly HOST MYUSER DISK NIC TEMP_MNT INSTALLER_DIR 
+
+  # Cleanup screen output of this function
+  for (( i = 0 ; i < 16 ; i++ )); do 
+    printf "${UP}${DEL}"
+  done
+}
+
+
+
+# ______________________________________________________________________________
+# ___  partition_disk  _________________________________________________________
+# 
+# usage: partition_disk
+#
+#  This function erases and partitions the disk with the following partition table:
+#  NAME      SIZE      PARTLABEL
+#  /dev/sda1 550M      EFI_PART
+#  /dev/sda2 Remaining SYSTEM_PART
+#
+partition_disk() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  blkdiscard --verbose --force "${DISK}"
+  sgdisk --zap-all "${DISK}"
+  sgdisk --new=1:1M:+550M --typecode=1:EF00 --change-name=1:EFI_PART "${DISK}"
+  sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:SYSTEM_PART "${DISK}"
+  partprobe "${DISK}"
+
+  printf '\n\n%s\n' 'Partition table created.'
+  print_hw_info -p "${DISK}"
+  please_confirm 'Continue?'
+}
+
+
+
+# ______________________________________________________________________________
+# ___  create_brtrfs  __________________________________________________________
+# 
+# usage: create_btrfs
+#
+#
+create_btrfs() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  local subvolumes=('@' '@home' '@root' '@srv' '@var' '@tmp')
+  local mount_options='noatime,compress=zstd:0'
+
+  #create filesystem and mount toplevel subvolume to temporary mountpoint
+  mkfs.btrfs --label SYSTEM_FS /dev/disk/by-partlabel/SYSTEM_PART
+  mount -t btrfs LABEL=SYSTEM_FS "${TEMP_MNT}" 
+
+  #create subvolumes
+  for volume in "${subvolumes[@]}"; do
+    btrfs subvolume create "${TEMP_MNT}/${volume}" || fail 'Failed to create subvolumes'
+  done
+
+  #create first "snapshot" and unmout toplevel subvolume
+  mkdir -v "${TEMP_MNT}/@/1"
+  btrfs subvolume create "${TEMP_MNT}/@/1/snapshot"
+  umount "${TEMP_MNT}"
+
+  #mount first "snapshot" to temporary mount point and set to default
+  mount -t btrfs -o subvol=/@/1/snapshot,"${mount_options}" -L SYSTEM_FS "${TEMP_MNT}"
+  btrfs subvol set-default "${TEMP_MNT}"
+
+  #create directories
+  mkdir -v "${TEMP_MNT}/.snapshots"
+  for dir in "${subvolumes[@]/@/}"; do
+    [[ -n "${dir}" ]] && mkdir -v "${TEMP_MNT}/${dir}"
+  done
+
+  #mount subvolumes
+  mount -t btrfs -o subvol=@ -L SYSTEM_FS "${TEMP_MNT}/.snapshots"
+  for dir in "${subvolumes[@]/@/}"; do
+    [[ -n "${dir}" ]] && mount -t btrfs -o subvol=@"${dir}" -L SYSTEM_FS "${TEMP_MNT}/${dir}"
+  done
+
+  # give root user rights on the root home folder
+  #chmod -v 750 "${TEMP_MNT}/root"
+
+  # Print function results
+  printf '\n\n%s\n' 'Created and mounted BTRFS filesystem.'
+  cat /proc/mounts | grep btrfs
+  please_confirm 'Continue?'
+}
+
+
+
+# ______________________________________________________________________________
+# ___  create_efifs  ___________________________________________________________
+# 
+#  usage: create_efifs
+#
+#
+create_efifs() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  mkfs.vfat -n EFI_FS /dev/disk/by-partlabel/EFI_PART
+  mkdir -vp "${TEMP_MNT}/boot/efi"
+  mount LABEL=EFI_FS "${TEMP_MNT}/boot/efi" || fail 'Failed to mount efi filesystem'
+  
+  printf '%s\n' 'Created EFI filesystem.'
+}
+
+
+
+# ______________________________________________________________________________
+# ___  generate_fstab  _________________________________________________________
+# 
+#  usage: generate_fstab
+#
+#  this function creates files: 'fstab'
+#  files to cleanup: 'fstab'
+#
+generate_fstab() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  genfstab -t LABEL "${TEMP_MNT}" > "${INSTALLER_DIR}/my-system/my-base/fstab"
+  sed -i 's|subvolid=[0-9]\+,||g' "${INSTALLER_DIR}/my-system/my-base/fstab"
+  sed -i 's|,subvol=/@/1/snapshot||g' "${INSTALLER_DIR}/my-system/my-base/fstab"
+
+  printf '%s\n' 'Created fstab.'
+}
+
+
+
+# ______________________________________________________________________________
+# ___  generate_network_config  ________________________________________________
+# 
+#  usage: generate_network_config
+#
+#
+generate_network_config() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  echo "${HOST}" >"${INSTALLER_DIR}/my-system/my-base/hostname"
+  echo 'Created file: "hostname"'
+
+  install --mode=0644 "${INSTALLER_DIR}/my-system/my-base/hosts.skel" "${INSTALLER_DIR}/my-system/my-base/hosts"
+  sed -i "s|\$hostname|${HOST}|g" "${INSTALLER_DIR}/my-system/my-base/hosts"
+
+  printf '%s\n' 'Created hosts file:'
+}
+
+
+# ______________________________________________________________________________
+# ___ create_repo_build_packages _______________________________________________
+# 
+#  usage: create_repo_build_packages
+#
+#  This function creates a local repo on the new system.
+#  Then looks for package directories in the current directory.
+#  Iterates through them, builds and adds the build package to the local repo
+#  
+create_repo_build_packages() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  local my_repo packagedirs=() dir 
+  my_repo="${TEMP_MNT}/var/cache/pacman/my-repo"
+  install -d "${my_repo}"
+
+  cd "${INSTALLER_DIR}"/my-system || fail
+  mapfile -t packagedirs < <(find . -maxdepth 2 -name 'PKGBUILD' -printf '%h\n')
+  for dir in "${packagedirs[@]}"; do
+    cd "${dir}" || fail "Could not cd into ${dir}"
+    printf '%s\n' "Building ${dir:2}"
+    env EUID=1000 PACKAGER="Cas <cas@home.arpa>" PKGDEST="${my_repo}" \
+      makepkg --noconfirm --clean --skipchecksums
+    cd ..
+  done
+
+  repo-add "${my_repo}"/my-repo.db.tar.zst "${my_repo}"/*.pkg.tar* \
+    || fail 'Failed to create repo'
+
+  printf '%b\n' "\n[my-repo]" "SigLevel = Optional TrustAll" "Server = file:///${my_repo}" >> /etc/pacman.conf
+  pacman -Sy || fail 'Failed to sync my-repo'
+}
+
+
+# ______________________________________________________________________________
+# ___  prepare_pacstrap  _______________________________________________________
+# 
+#  usage: prepare_pacstrap
+#
+#  install pacman with custom databse location
+#  the default pacman database location is /var/lib/pacman. 
+#  this gives me issues when i rollback my system using snapshots. in my btrfs
+#  filesystem layout the /var subvolume is not included in the root snapshot.
+#  var shouldnt contain any data that is essential. when i rollback to a previous 
+#  system state the database contained in /var/lib/pacman doesnt reflect the
+#  current system anymore. it might be very well possible certain packages are
+#  included or missing in the pacman database that are still installed or missing
+#  on the rolled back system. 
+#  when i install pacman to /usr/lib/pacman this isnt an issue since this folder
+#  is part of the system state that is rolled back. this folder is included in 
+#  the snapshot. 
+#  i use a bind mount to be able to install the pacman database to /usr/lib/pacman
+#  on the new system without changing pacstrap settings.
+#  when booting into the new system this mount doesnt exist, i have a pacman.conf
+#  that points to dbpath=/usr/lib/pacman and a database in /usr/lib/pacman. #
+prepare_pacstrap() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  mkdir -v --parents "${TEMP_MNT}/usr/lib/pacman" "${TEMP_MNT}/var/lib/pacman"       
+  echo "See pacman.conf pacman database location" > "${TEMP_MNT}/var/lib/pacman/readme.txt"
+  mount -v --bind "${TEMP_MNT}/usr/lib/pacman" "${TEMP_MNT}/var/lib/pacman"
+}
+
+
+
+# ______________________________________________________________________________
+# ___  pacstrap_system  ________________________________________________________
+# 
+#  usage: pacstrap_system
+#
+#  find all 'my-'packages in the local repo. 
+#  sort the packages by the double digit number between [] in the package 
+#  description.
+#  Install the packages in order.
+#
+#  In this function the ~= operator is used to test regular expressions.
+#  [[ test =~ regexp ]] the operator returns true if it is able to match.
+#  The array variable BASH_REMATCH records wich part of the string matched the 
+#  pattern. The element of BASH_REMATCH with index 0 contains the portion of 
+#  the string matching the entire regular expression. Substrings matched within
+#  the regex are saved in the remaining BASH_REMATCH indices.
+#
+#  In this funtion the regexp is used to first isolate and append and later 
+#  isolate and strip it from the string.
+#
+#  Search for '[[ expression ]]' in the bash manual.
+#  expamle at: https://gist.github.com/JPvRiel/4cf82d42beb6387dec7eadc43cef6c17
+#
+pacstrap_system() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+
+  local mypackages=() numberedpackages=() orderedpackages=() pkg
+  readarray -t mypackages < <(pacman -Ssq '^my-')
+
+  for pkg in "${mypackages[@]}"; do
+    [[ $(pacinfo --short "${pkg}") =~ \[.*([0-9]{2}).*\] ]] \
+      && pkg="${BASH_REMATCH[1]}${pkg}" \
+      && numberedpackages+=("${pkg}")
+  done
+
+  readarray -t orderedpackages < <(printf '%s\n' "${numberedpackages[@]}" | sort)
+
+  for pkg in "${orderedpackages[@]}"; do
+    [[ $pkg =~ ^[0-9]{2}(.*) ]] && pkg="${BASH_REMATCH[1]}"
+    printf '%s\n' "Installing ${pkg}"
+#  because i run into dependencies with multiple providers the my-audio-video 
+#  package cannot be installed without user input. I have to choose the correct
+#  package providers. this can be solved by installing --asdeps but then i cant
+#  use the automation in this function. This is sovled by using the 
+#  --assume-installed option. These options dont affect the installtion.
+    pacstrap "${TEMP_MNT}" \
+      --assume-installed jack \
+      --assume-installed libjack.so=0-64 \
+      "${pkg}" || fail "Failed to install ${pkg}"
+  done
+
+  cp -dr --no-preserve=mode,timestamp "${INSTALLER_DIR}/skel" "${TEMP_MNT}/etc"
+}
+
+
+
+# ______________________________________________________________________________
+# ___  create_user_set_passwords  ______________________________________________
+# 
+#  usage: create_user_set_password
+#
+#
+create_user_set_passwords() {
+  printf '\n%s\n' "${FUNCNAME[0]}"
+  
+  printf '%s\n' "Set password for root."
+  arch-chroot "${TEMP_MNT}" passwd
+
+  arch-chroot "${TEMP_MNT}" \
+    useradd --shell /bin/bash --user-group --groups wheel \
+    --create-home --btrfs-subvolume-home "${MYUSER}" \
+    || fail 'Failed to create user'
+  printf '%s\n' "Created user ${MYUSER}."
+
+  cp -rv "${INSTALLER_DIR}"/my-system "${TEMP_MNT}"/home/"${MYUSER}"
+  arch-chroot "${TEMP_MNT}" chown -Rv "${MYUSER}" /home/"${MYUSER}"/my-system
+  arch-chroot "${TEMP_MNT}" chown -Rv "${MYUSER}" /var/cache/pacman/my-repo
+
+  printf '%s\n' "Set password for ${MYUSER}."
+  arch-chroot "${TEMP_MNT}" passwd "${MYUSER}"
+
+}
+
+
+
+# ______________________________________________________________________________
+# ___  function  _______________________________________________________________
+# 
+# usage:
+#
+#
+main() {
+  preflight_check
+  printf "${CLEAR}"
+  set_install_vars
+  confirm_installation
+  prepare_installation
+  partition_disk
+  create_btrfs
+  create_efifs
+  generate_fstab
+  generate_network_config
+  create_repo_build_packages
+  prepare_pacstrap
+  pacstrap_system
+  create_user_set_passwords
+  printf '\n%s\n\n' 'INSTALLATION COMPLETED!!'
+}
+
+main

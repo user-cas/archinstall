@@ -1,0 +1,20 @@
+# Maintainer: Cas 
+pkgname='my-aur'
+pkgdesc="Meta - My Arch system aur packages [Install order = 90]"
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=()
+package(){
+  depends=(
+    'ananicy-cpp'
+    'ananicy-rules-git'
+    'autotiling'
+    'systemd-oomd-defaults'
+  )
+}
+
+sha256sums=(
+)

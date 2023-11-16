@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# This script is called from clean_pacman_cache.hook in /etc/pacman.d/hooks/.
+# This script is called after every remove, install and upgrade. 
+# The paccache comamnd is part of the pacman-contrib package. 
+# This script checks for orphans, cleans cache and retains only one past 
+# version of currently installed packages.
+
+if [[ $(whoami) != root ]]; then
+  echo 'This script should be run as root'
+  exit
+fi
+
+paccache -rk1
+
+packages="$(pacman -Qtdq)"
+if [[ -n "${packages}" ]]; then
+  printf '\n%s\n\n%s\n' "The following orphaned packages have been found:" "${packages}"
+  printf '\n%s\n' "Run my-remove_orphans for removal"
+fi
+
+

@@ -1,0 +1,31 @@
+# Auth with polkit-gnome:
+exec /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+# Desktop notifications
+exec mako
+
+# see /etc/sway/config.d/50-systemd-user.conf
+exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+exec hash dbus-update-activation-environment 2>/dev/null && \
+     dbus-update-activation-environment --systemd DISPLAY WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+     
+# Autotiling
+exec autotiling
+
+# nm-applet
+exec nm-applet --indicator
+
+
+# Clipman
+exec clipman restore
+exec wl-paste -t text --watch clipman store
+
+# Gnome Keyring
+#exec gnome-keyring-daemon --daemonize --start --components=gpg,pkcs11,secrets,ssh
+
+# Xdg DEsktop Portal
+exec /usr/libexec/xdg-desktop-portal
+
+# Cheatsheet
+exec micro ~/.config/sway/cheatsheet
+

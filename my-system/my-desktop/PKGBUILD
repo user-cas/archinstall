@@ -1,0 +1,53 @@
+# Maintainer: Cas 
+pkgname='my-desktop'
+pkgdesc='Meta - My desktop packages and configuration. [Install order = 50]'
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=(
+  'config.toml'
+  'shell.desktop'
+  'powermenu.tar.zst'
+  'vanboxtel.tar.zst'
+)
+package(){
+  depends=(
+    'blueman'
+    'caja'
+    'capitaine-cursors'
+    'flatpak'
+    'foot' 
+    'greetd' 
+    'greetd-tuigreet'
+    'keepassxc'
+    'mako'
+    'network-manager-applet'
+    'pavucontrol'
+    'polkit'
+    'polkit-gnome'
+    'remmina'
+    'slurp'
+    'sway'
+    'swaybg'
+    'swayidle'
+    'swaylock'
+    'tailscale'
+    'waybar'
+    'wayland'
+    'wl-clipboard'
+    'wofi'
+    'xdg-desktop-portal-wlr'
+    'xdg-utils'
+    'xorg-xwayland'
+  )
+  install="$pkgname.install"
+  
+  install -D --mode=0644 shell.desktop "$pkgdir/etc/greetd/shell.desktop"
+  install -D --mode=0644 powermenu/*.svg -t "$pkgdir/usr/share/icons/"
+  install -D --mode=0644 powermenu/*.desktop -t "$pkgdir/usr/share/applications/"
+  install -D --mode=0666 vanboxtel/*.remmina -t "$pkgdir/home/cas/.local/share/remmina/"
+
+  install -D --mode=0644 config.toml "$pkgdir/usr/share/factory/my-desktop/etc/greetd/config.toml"
+}

@@ -1,0 +1,119 @@
+# Maintainer: Cas 
+pkgname='my-base'
+pkgdesc="Meta - My Arch system installation and configuration [Install order = 00]"
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=(
+  'cmdline'
+  'dns.conf'
+  'doas.conf'
+  'fstab'
+  'hostname'
+  'hosts'
+  'locale.conf'
+  'locale.gen'
+  'makepkg.conf'
+  'my-build_package'
+  'my-clean_pacman_cache'
+  'my-clean_pacman_cache.hook'
+  'my-create_refind_bootmenu'
+  'my-firstboot'
+  'my-firstboot.service'
+  'my-remove_orphans'
+  'my-setup_chaotic_aur'
+  'my-ukify.conf'
+  '99-my-ukify.hook'
+  'my-update'
+  'pacman.conf'
+  'refind.conf'
+  'refind-theme.tar.zst'
+  'root'
+  'snapper'
+  'zram-generator.conf'
+)
+backup=(
+  'etc/kernel/cmdline'
+  'etc/NetworkManager/conf.d/dns.conf'
+  'etc/doas.conf'
+  'etc/hostname'
+  'etc/locale.conf'
+  'usr/local/bin/my-build_package'
+  'usr/local/bin/my-clean_pacman_cache'
+  'etc/pacman.d/hooks/my-clean_pacman_cache.hook'
+  'usr/local/bin/my-create_refind_bootmenu'
+  'usr/local/bin/my-firstboot'
+  'etc/systemd/system/my-firstboot.service'
+  'usr/local/bin/my-remove_orphans'
+  'usr/local/bin/my-setup_chaotic_aur'
+  'etc/my-ukify.conf'
+  'usr/share/libalpm/hooks/99-my-ukify.hook'
+  'usr/local/bin/my-update'
+  'boot/efi/EFI/refind/refind.conf'
+  'etc/snapper/configs/root'
+  'etc/systemd/zram-generator.conf'
+)
+md5sums=()
+package(){
+  depends=(
+    'amd-ucode'
+    'base'
+    'booster'
+    'btrfs-progs'
+    'dosfstools'
+    'iptables-nft'
+    'jq'
+    'linux-zen'
+    'linux-firmware'
+    'man-db'
+    'man-pages'
+    'micro'
+    'networkmanager'
+    'opendoas'
+    'refind'
+    'snapper' 
+    'systemd-ukify'
+    'usbutils'
+    'zram-generator' 
+  )
+  provides=('sudo')
+  conflicts=('sudo')
+  install="$pkgname.install"
+  
+  install -D --mode=0644 cmdline "$pkgdir/etc/kernel/cmdline"
+  install -D --mode=0644 dns.conf "$pkgdir/etc/NetworkManager/conf.d/dns.conf"
+  install -D --mode=0644 doas.conf "$pkgdir/etc/doas.conf"
+  install -D --mode=0644 hostname "$pkgdir/etc/hostname"
+  install -D --mode=0644 locale.conf "$pkgdir/etc/locale.conf"
+  install -D --mode=0644 my-clean_pacman_cache.hook "$pkgdir/etc/pacman.d/hooks/my-clean_pacman_cache.hook"
+  install -D --mode=0644 my-firstboot.service "$pkgdir/etc/systemd/system/my-firstboot.service"
+  install -D --mode=0644 my-ukify.conf "$pkgdir/etc/my-ukify.conf" 
+  install -D --mode=0644 99-my-ukify.hook "$pkgdir/usr/share/libalpm/hooks/99-my-ukify.hook"
+  install -D --mode=0755 refind.conf "$pkgdir/boot/efi/EFI/refind/refind.conf"
+  install -D --mode=0755 theme/*.* -t "$pkgdir/boot/efi/EFI/refind/theme/"
+  install -D --mode=0644 root "$pkgdir/etc/snapper/configs/root"
+  install -D --mode=0644 zram-generator.conf "$pkgdir/etc/systemd/zram-generator.conf"
+
+  install -D --mode=0777 my-build_package "$pkgdir/usr/local/bin/my-build_package"
+  install -D --mode=0777 my-clean_pacman_cache "$pkgdir/usr/local/bin/my-clean_pacman_cache"
+  install -D --mode=0777 my-create_refind_bootmenu "$pkgdir/usr/local/bin/my-create_refind_bootmenu"
+  install -D --mode=0777 my-firstboot "$pkgdir/usr/local/bin/my-firstboot"
+  install -D --mode=0777 my-remove_orphans "$pkgdir/usr/local/bin/my-remove_orphans"
+  install -D --mode=0777 my-setup_chaotic_aur "$pkgdir/usr/local/bin/my-setup_chaotic_aur"
+  install -D --mode=0777 my-update "$pkgdir/usr/local/bin/my-update"
+  
+  install -D --mode=0644 fstab "$pkgdir/usr/share/factory/my-base/etc/fstab"
+  install -D --mode=0644 hosts "$pkgdir/usr/share/factory/my-base/etc/hosts"
+  install -D --mode=0644 locale.gen "$pkgdir/usr/share/factory/my-base/etc/locale.gen"
+  install -D --mode=0644 makepkg.conf "$pkgdir/usr/share/factory/my-base/etc/makepkg.conf"
+  install -D --mode=0644 pacman.conf "$pkgdir/usr/share/factory/my-base/etc/pacman.conf"
+  install -D --mode=0644 snapper "$pkgdir/usr/share/factory/my-base/etc/conf.d/snapper"
+
+  ln -sf /usr/share/zoneinfo/Europe/Amsterdam "$pkgdir/etc/localtime"
+  #ln -sf /run/systemd/resolve/stub-resolv.conf "$pkgdir/etc/resolv.conf"
+
+  install -d "$pkgdir"/usr/bin
+  ln -s /usr/bin/doas "$pkgdir"/usr/bin/sudo
+}

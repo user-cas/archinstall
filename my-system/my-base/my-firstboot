@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+
+
+snapper_snapshot() {
+  snapper create -t single -d "First snapshot" -c number
+  cp /.snapshots/2/info.xml /.snapshots/1/info.xml
+  sed -i "s/<num>2<\/num>/<num>1<\/num>/" /.snapshots/1/info.xml
+  sed -i 's/First snapshot/First boot/' /.snapshots/1/info.xml
+}
+
+refind_manual() {
+  sed -i 's/scanfor i/#scanfor i/' /boot/efi/EFI/refind/refind.conf
+  sed -i 's/#scanfor m/scanfor m/' /boot/efi/EFI/refind/refind.conf
+  sed -i 's/#include/include/' /boot/efi/EFI/refind/refind.conf
+}
+
+main() {
+  snapper_snapshot
+  my-create_refind_bootmenu
+  refind_manual
+  systemctl disable my-firstboot.service
+  rm /root/.local/bin/my-firstboot
+  rm /etc/systemd/system/my-firstboot.service
+  systemctl reboot
+}
+
+main
+

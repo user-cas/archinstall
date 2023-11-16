@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+MY_REPO=/var/cache/pacman/my-repo
+
+# ______________________________________________________________________________
+# ___ fail _____________________________________________________________________
+# 
+# usage: fail [ message ] [ custom errorcode ]
+#
+#
+# "${1:-''}" = $1 or '' when null or unset
+# "${2-1}" = $2 or "1" when unset
+# shellcheck disable=SC2120
+fail() {
+  local message="${1:-}"
+  printf '\n%s' "Script aborted"
+  printf '\n%s\n' "${message}"
+  exit "${2-1}" ## Return a code specified by $2, or 1 by default.
+}
+
+
+# ______________________________________________________________________________
+# ___  please_confirm  _________________________________________________________
+# 
+#  usage: please_confirm [ message ]
+#
+#
+please_confirm() {
+  local message reply
+
+  message="$1"
+  if [[ -n "${message}" ]]; then
+    printf '\n%s\n\n' "${message}"
+  fi
+
+  until [[ "${reply}" == 'YES' ]]; do
+    printf '%s' "Type YES to confirm, ABORT to quit: "; read -r reply
+    if [[ 'ABORT' == "${reply}" ]]; then
+      fail "Aborted by user"
+    fi
+  done
+}
+
+
+check_package_integrity() {
+
+  namcap -i -e tags,checksums PKGBUILD || fail 'Namcap package check failed'
+}
+
+
+check_package_version() {
+
+  PKG=$(makepkg --packagelist)
+  PKG=${PKG##*/}
+  [[ -e "${MY_REPO}"/"${PKG}" ]] && fail 'Package already exists in my-repo'
+}
+
+
+check_updates() {
+
+  if (( "$(checkupdates | wc -l)" > 0 )); then
+    printf '\n%s\n' 'System is not up-to-date'
+    please_confirm 'Continue anyway?'
+  fi
+
+}
+
+
+# ______________________________________________________________________________
+# ___ create_repo_build_packages ___________________________________________________________
+# 
+#  usage: create_repo_build_packages
+#
+#  This package creates a local repo on the new system.
+#  Then looks for package directories in the current directory.
+#  Iterates through them, builds and adds the build package tot the local repo
+#  
+create_package_update_repo() {
+
+  env PACKAGER="Cas <cas@home.arpa>" PKGDEST="${MY_REPO}" \
+    makepkg --noconfirm --clean --skipchecksums
+
+  repo-add "${MY_REPO}"/my-repo.db.tar.zst "${MY_REPO}"/"${PKG}" \
+    || fail 'Failed to add package'
+
+}
+
+
+# ______________________________________________________________________________
+# ___  function  _______________________________________________________________
+# 
+# usage:
+#
+#
+main() {
+  [[ -e PKGBUILD ]] || fail 'No PKGBUILD in this directory'
+  check_package_integrity
+  check_package_version
+  check_updates
+  create_package_update_repo
+}
+
+main

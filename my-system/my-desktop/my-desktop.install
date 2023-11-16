@@ -1,0 +1,34 @@
+_logdate="$(date +%y%m%d-%H:%M)"
+_pkgname='my-desktop'
+_config_files=($(find /usr/share/factory/"${_pkgname}" -type f))
+
+_install_config_files() {
+  if [[ $1 == install ]]; then
+    for file in "${_config_files[@]}"; do
+      install -D --verbose --mode=0644 --backup --suffix='.orig' \
+      "${file}" "${file#/usr/share/factory/"${_pkgname}"/}"
+    done
+  fi
+
+  if [[ $1 == upgrade ]]; then
+    for file in "${_config_files[@]}"; do
+      install --verbose --compare --mode=0644 --backup --suffix=".${_logdate}" \
+      "${file}" "${file#/usr/share/factory/"${_pkgname}"/}"
+    done
+  fi
+}
+_setup_tuigreet() {
+  useradd -M -G video greeter
+  chmod -R go+r /etc/greetd/
+  systemctl enable greetd
+}
+
+post_install() {
+  _install_config_files install
+  _setup_tuigreet
+}
+
+post_upgrade() {
+  _install_config_files upgrade
+}
+

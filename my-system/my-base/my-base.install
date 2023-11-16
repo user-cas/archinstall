@@ -1,0 +1,44 @@
+_logdate="$(date +%y%m%d-%H:%M)"
+_pkgname='my-base'
+_config_files=($(find /usr/share/factory/"${_pkgname}" -type f))
+
+_install_config_files() {
+  if [[ $1 == install ]]; then
+    for file in "${_config_files[@]}"; do
+      install -D --verbose --mode=0644 --backup --suffix='.orig' \
+      "${file}" "${file#/usr/share/factory/"${_pkgname}"/}"
+    done
+  fi
+
+  if [[ $1 == upgrade ]]; then
+    for file in "${_config_files[@]}"; do
+      install --verbose --compare --mode=0644 --backup --suffix=".${_logdate}" \
+      "${file}" "${file#/usr/share/factory/"${_pkgname}"/}"
+    done
+  fi
+}
+
+_enable_timers() {
+  systemctl enable man-db.timer
+  systemctl enable fstrim.timer
+}
+
+_setup_systemd() {
+  timedatectl set-ntp true
+  systemctl enable systemd-resolved
+  systemctl enable NetworkManager.service
+  systemctl enable my-firstboot.service
+}
+
+post_install() {
+  _install_config_files install
+  locale-gen
+  _enable_timers
+  _setup_systemd
+  refind-install
+}
+
+post_upgrade() {
+  _install_config_files upgrade
+}
+

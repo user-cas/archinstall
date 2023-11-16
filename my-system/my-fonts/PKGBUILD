@@ -1,0 +1,17 @@
+# Maintainer: Cas
+pkgname='my-fonts'
+pkgdesc='Meta - fonts & configuration [Install order = 10]' 
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=('local.conf')
+md5sums=()
+package(){
+  depends=('ttf-croscore' 'ttf-jetbrains-mono-nerd') 
+  
+  install -D --mode=0644 local.conf "$pkgdir/etc/fonts/local.conf" 
+}
+
+

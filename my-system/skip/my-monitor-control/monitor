@@ -1,0 +1,71 @@
+Install ddcutil package to manage monitor settings. Generally speaking, any settings that
+can be changed by pressing buttons on the monitor canm be modified by ddcutil.
+
+requires ddcutil package and i2c-dev kernel module. pacman installs i2c-tools as a 
+dependency for ddcutil.
+
+create file /etc/modules-load.d/i2c-dev.conf with only the following text "i2c-dev" to 
+load the kernel module on boot. 
+permission for using the /dev/i2c-* devices can be granted by adding the user to the
+i2c user group.
+
+ddcutil has several useful subcommands. The general way to use ddcutil is:
+ddcutil command [address monitor] [arguments]
+
+There are multiple methods to address your montitor. the most useful are --display and --bus.
+--bus is the fastest. You can find your monitor info by using 'ddcutil detect' command.
+
+You dont neet to address the monitor when only one monitor is connected. 
+
+usefull ddcutil commands:
+ddcutil detect
+	-Show general information on the connected displays.
+ddcutil capabilities
+	-Queries which display features can get/set for a given monitor.
+	 Shows a list starting with commmands and their code. These are the commands supported
+	 by the monitor. These are the commands we use with the ddcutil utility.
+	 The VCP Features have a code which you can address using the getvcp and setvcp commands.
+	 The feature description in this list are the standard descriptions they might not 
+	 exactly correspond to the actual monitor values. 
+	 An example for this is the feature group DC on my Asus Proart monitor. The DC group
+	 consists of 9 values 00 should be Standard/Default mode but all other modes are 
+	 reported as 'Unrecognized value'. This does not mean they dont work. ddcutil just 
+	 does not know what label/name these values have in the monitor.
+	 value 0b for instance represents 'Scenery Mode' in the ProArt OSD presets.
+ddcutil vcpinfo --verbose (feature-code-or-group)
+	-Shows general information and description regarding the given feature code.
+ddcutil getvcp <feature-code-or-group>
+	-Report VCP featue values set in the given monitor.
+ddcutil setvcp <feature-code-or-group> [+|-] <new-value>
+	-Set the vcp featue value. for instance to turn of the monitor us the following command
+	 'ddcutil setvcp D6 05'.
+
+Useful feature codes for the Asus Proart monitor:
+
+Feature: 60 (Input Source)
+	Values:
+	03: DVI-1
+	11: HDMI-1
+	0f: DisplayPort-1
+	10: DisplayPort-2
+
+Feature: D6 (Power mode)
+	Values:
+	01: DPM: On,  DPMS: Off   (this turns the monitor on)
+	04: DPM: Off, DPMS: Off   (this sets the monitor to stand-by)
+	05: Write only value to turn off display 
+	
+Feature: DC (Display Mode)
+	Values:
+	0x0b: ProArt Preset: Scenery Mode (Mostly the same as sRGB mode exept full brightness)
+	0x0d: ProArt Preset: sRGB mode (Factory calibrated accurate color mode)
+	0x18: ProArt Preset: Darkroom mode (The same as sRGB but minimal brightness)
+
+ddcutil capabilities reports (abbreviated) two digit feature values. These all work with 
+setvcp, the display mode values however require you to use the entire four digit code. 
+
+sources:
+http://www.ddcutil.com/
+https://wiki.archlinux.org/title/I2C
+https://blog.tcharles.fr/ddc-ci-screen-control-on-linux/
+https://moverest.xyz/blog/control-display-with-ddc-ci/

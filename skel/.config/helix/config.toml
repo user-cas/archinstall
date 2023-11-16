@@ -1,0 +1,8 @@
+theme = "tokyonight_storm"
+
+[editor]
+line-number = "relative"
+rulers = [80]
+gutters = ["line-numbers","spacer"]
+
+

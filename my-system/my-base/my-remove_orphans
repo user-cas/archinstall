@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# The paccache command is part of the pacman-contrib package.
+# This script removes all orphaned packages and all cached versions of these 
+# packages.
+
+if [[ $(whoami) != root ]]; then
+  echo 'This script should be run as root'
+  exit
+fi
+
+
+packages="$(pacman -Qtdq)"
+if [[ -n "${packages}" ]]; then
+  pacman -Rsn "${packages}" 
+  paccache -ruk0 
+  printf '\n%s\n\n%s\n' "The following packages have been removed" "${packages}"
+else
+  echo 'No orphaned packages found'
+fi

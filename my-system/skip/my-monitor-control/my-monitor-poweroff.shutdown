@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+#i use this script to poweroff my Asus ProArt monitor when turn of the PC. This forces me
+#to manually turn it on. I do this because it is very slow to wake from standby.
+#
+#install this script to the /usr/lib/systemd/system-shutdown/ directory.
+#scripts in this directory will execute right before system halt/poweroff/reboot
+#the script needs to end with .shutdown extention for it to execute during shutdown.
+#
+#https://unix.stackexchange.com/a/479048
+#
+#use the following  command to install the script:
+#install --mode 0755 my-monitor-poweroff.shutdown /usr/lib/systemd/system-shutdown/my-monitor-poweroff.shutdown
+#
+
+ddcutil setvcp D6 05

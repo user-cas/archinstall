@@ -1,0 +1,22 @@
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/modules/*/vmlinuz
+
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = amd-ucode
+
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = intel-ucode
+
+[Action]
+Description = Creating unified kernel image with ukify...
+When = PostTransaction
+Exec = /usr/lib/systemd/ukify build --config=/etc/my-ukify.conf --output=/boot/arch-linux.efi

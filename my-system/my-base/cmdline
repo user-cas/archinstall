@@ -1,0 +1,1 @@
+root=LABEL=SYSTEM_FS zswap.enabled=0 nowatchdog loglevel=3

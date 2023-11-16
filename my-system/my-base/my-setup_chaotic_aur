@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# ______________________________________________________________________________
+# ___ fail _____________________________________________________________________
+# 
+# usage: fail [ message ] [ custom errorcode ]
+#
+#
+# "${1:-''}" = $1 or '' when null or unset
+# "${2-1}" = $2 or "1" when unset
+# shellcheck disable=SC2120
+fail() {
+  local message="${1:-}"
+  printf '\n%s' "Script aborted"
+  printf '\n%s\n' "${message}"
+  exit "${2-1}" ## Return a code specified by $2, or 1 by default.
+}
+
+# ______________________________________________________________________________
+# ___ setup_chaotic_aur ________________________________________________________
+# 
+# usage: setup_chaotic_aur 
+#
+# https://aur.chaotic.cx
+#
+setup_chaotic_aur() {
+count=0
+
+until pacman-key --recv-key FBA220DFC880C036 --keyserver keyserver.ubuntu.com; do
+  count=$((count + 1))
+  [[ count -gt 2 ]] && fail "Failed to fetch chaotic-aur key after three tries"
+  sleep 4
+done
+
+pacman-key --lsign-key FBA220DFC880C036
+pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' >>/etc/pacman.conf
+}
+
+
+if [[ $(whoami) != root ]]; then
+  echo 'This script should be run as root'
+  exit
+fi
+
+setup_chaotic_aur

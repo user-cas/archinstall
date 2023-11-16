@@ -1,0 +1,17 @@
+# Maintainer: Cas 
+pkgname='my-bluetooth'
+pkgdesc="Meta - Bluetooth [Install order = 40]"
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=()
+md5sums=()
+package(){
+  depends=(
+    'bluez'
+    'bluez-utils'
+  )
+}
+

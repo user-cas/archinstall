@@ -1,0 +1,41 @@
+# Maintainer: Cas 
+pkgname=my-cli
+pkgver=1
+pkgrel=1
+pkgdesc="Meta - My CLI applications and configuration. [Install order = 30]"
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+source=('reflector.conf')
+backup=()
+package(){
+depends=(
+  'inxi' 
+  'base-devel' 
+  'dmidecode' 
+  'exfatprogs' 
+  'nfs-utils' 
+  'ntfs-3g' 
+  'bash-completion' 
+  'xdg-user-dirs' 
+  'bat' 
+  'fish' 
+  'rsync'
+  'openssh'
+  'namcap'
+  'python' 
+  'pacman-contrib' 
+  'reflector' 
+  'helix' 
+  'git' 
+  'eza' 
+  'irqbalance' 
+  'fd'
+  'transmission-cli'
+  'tealdeer'
+)
+install="$pkgname.install"
+
+install -D --mode=0644 reflector.conf "$pkgdir/usr/share/factory/my-cli/etc/xdg/reflector/reflector.conf"
+}
+

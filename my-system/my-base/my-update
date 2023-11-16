@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+
+if [[ $(whoami) != root ]]; then
+  echo 'This script should be run as root'
+  exit
+fi
+
+echo 'Creating root snapshot'
+snapper --config root create --description "pacman -Syu" --type single --cleanup-algorithm number
+echo 'Updating /boot/efi/EFI/refind/refind_snapshot.conf'
+my-create_refind_bootmenu
+pacman -Syu

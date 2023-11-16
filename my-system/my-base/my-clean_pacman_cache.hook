@@ -1,0 +1,12 @@
+
+[Trigger]
+Operation = Remove
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Running cleanup "my-clean_pacman_cache"
+When = PostTransaction
+Exec = /usr/local/bin/my-clean_pacman_cache

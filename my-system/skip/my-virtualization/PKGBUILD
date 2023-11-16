@@ -1,0 +1,20 @@
+# Maintainer: Cas
+pkgname='my-virt-manager'
+pkgdesc='Meta - libvirt/QEMU/KVM support using virt-manager [Install order = 90]'
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/user-cas/archinstall'
+license=('MIT')
+install=$pkgname.install
+package() {
+  depends=(
+    'bridge-utils' 
+    'dnsmasq'
+    'edk2-ovmf'
+    'iptables-nft'
+    'libvirt'
+    'openbsd-netcat'
+    'qemu-base'
+    'virt-manager')
+}

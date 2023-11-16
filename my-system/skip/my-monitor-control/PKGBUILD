@@ -1,0 +1,17 @@
+pkgname='my-monitor-control'
+pkgdesc='Meta - Enables modifying monitor settings using ddcutil [Install order = 90]' 
+pkgver=1
+pkgrel=1
+arch=('any')
+url="https://github.com/user-cas/archinstall"
+license=('MIT')
+source=(
+  'my-monitor-poweroff.shutdown'
+  'i2c-dev.conf'
+)
+package(){
+  depends=('ddcutil' 'i2c-tools')
+
+  install -D --mode=0755 my-monitor-poweroff.shutdown "$pkgdir/usr/lib/systemd/system-shutdown/my-monitor-poweroff.shutdown"
+  install -D --mode=0644 i2c-dev.conf "$pkgdir/etc/modules-load.d/i2c-dev.conf"
+}
