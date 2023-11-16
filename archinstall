@@ -79,7 +79,8 @@ prepare_installation() {
   sed -i 's|#ParallelDownloads = 5|ParallelDownloads = 15|' /etc/pacman.conf
 
   printf '%s\n' 'Installing base-devel, git'
-  pacman -Sy --noconfirm archlinux-keyring
+  pacman -Sy --noconfirm --needed archlinux-keyring \
+    || fail "Pacmain failed to update archlinux-keyring"
   pacman -S --noconfirm --needed pacutils base-devel \
     || fail "Pacman failed to install pacutils & base-devel"
 }
@@ -559,8 +560,8 @@ pacstrap_system() {
 #  use the automation in this function. This is sovled by using the 
 #  --assume-installed option. These options dont affect the installtion.
     pacstrap "${TEMP_MNT}" \
-      --assume-installed jack \
-      --assume-installed libjack.so=0-64 \
+      # --assume-installed jack \
+      # --assume-installed libjack.so=0-64 \
       "${pkg}" || fail "Failed to install ${pkg}"
   done
 
