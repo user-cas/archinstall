@@ -334,7 +334,6 @@ partition_disk() {
 
   printf '\n\n%s\n' 'Partition table created.'
   print_hw_info -p "${DISK}"
-  please_confirm 'Continue?'
 }
 
 
@@ -387,7 +386,6 @@ create_btrfs() {
   # Print function results
   printf '\n\n%s\n' 'Created and mounted BTRFS filesystem.'
   cat /proc/mounts | grep btrfs
-  please_confirm 'Continue?'
 }
 
 
@@ -547,7 +545,7 @@ pacstrap_system() {
   printf '\n%s\n' "${FUNCNAME[0]}"
 
   local mypackages=() numberedpackages=() orderedpackages=() pkg fixdeps
-  fixdeps='--assume-installed jack --assume-installed libjack.so=0-64'
+  fixdeps=('--assume-installed' 'jack' '--assume-installed' 'libjack.so=0-64')
   readarray -t mypackages < <(pacman -Ssq '^my-')
 
   for pkg in "${mypackages[@]}"; do
@@ -560,8 +558,7 @@ pacstrap_system() {
   for pkg in "${orderedpackages[@]}"; do
     [[ $pkg =~ ^[0-9]{2}(.*) ]] && pkg="${BASH_REMATCH[1]}"
     printf '%s\n' "Installing ${pkg}"
-    pacstrap "${TEMP_MNT}" "${fixdeps}" "${pkg}" \
-      || fail "Failed to install ${pkg}"
+    pacstrap "${TEMP_MNT}" "${fixdeps[@]}" "${pkg}" 
   done
 
   cp -dr --no-preserve=mode,timestamp "${INSTALLER_DIR}/skel" "${TEMP_MNT}/etc"
